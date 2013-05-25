@@ -7,6 +7,7 @@ ev_timer timeout_watcher;
 
 void stdin_cb(EV_P_ ev_io *w, int revents)
 {
+  (void) revents;
   puts("stdin ready");
   ev_io_stop(EV_A_ w);
   ev_break(EV_A_ EVBREAK_ALL);
@@ -14,6 +15,8 @@ void stdin_cb(EV_P_ ev_io *w, int revents)
 
 void timeout_cb(EV_P_ ev_timer *w, int revents)
 {
+  (void) revents;
+  (void) w;
   puts("timeout");
   ev_break(EV_A_ EVBREAK_ONE);
 }
