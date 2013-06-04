@@ -1,34 +1,53 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <ev.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <sys/unistd.h>
+#include <sys/fcntl.h>
+#include <strings.h>
 
-ev_io stdin_watcher;
-ev_timer timeout_watcher;
+int sock;
+struct sockaddr_in addr;
+int addr_len;
 
-void stdin_cb(EV_P_ ev_io *w, int revents)
+void udp_readable_cb(EV_P_ ev_io *w, int revents)
 {
-  (void) revents;
-  puts("stdin ready");
-  ev_io_stop(EV_A_ w);
-  ev_break(EV_A_ EVBREAK_ALL);
-}
-
-void timeout_cb(EV_P_ ev_timer *w, int revents)
-{
-  (void) revents;
+  socklen_t bytes_read;
+  char buffer[1001];
+  (void) loop;
   (void) w;
-  puts("timeout");
-  ev_break(EV_A_ EVBREAK_ONE);
+  (void) revents;
+  printf("readable\n");
+  bytes_read = recvfrom(sock, buffer, 1000, 0, (struct sockaddr*) &addr,         
+   (socklen_t*) &addr_len);
+  buffer[bytes_read] = '\0';
+  printf(": %s\n", buffer);
 }
+
 
 int main(void)
 {
-  struct ev_loop *loop = EV_DEFAULT;
-  ev_io_init(&stdin_watcher, stdin_cb, 0, EV_READ);
-  ev_io_start(loop, &stdin_watcher);
-  ev_timer_init(&timeout_watcher, timeout_cb, 5.5, 0);
-  ev_timer_start(loop, &timeout_watcher);
-  ev_run(loop, 0); 
+  ev_io udp_watcher;
+  struct ev_loop *loop;
+  addr_len = sizeof(addr);
+  sock = socket(AF_INET, SOCK_DGRAM, 0);
+  fcntl(sock, F_SETFL, O_NONBLOCK);
+  bzero(&addr, addr_len);
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(42000);
+  addr.sin_addr.s_addr = INADDR_ANY;
+  if (bind(sock, (struct sockaddr*) &addr, addr_len) != 0)
+    fprintf(stderr, "could not bind\n");
+
+  loop = ev_default_loop(0);
+  ev_io_init(&udp_watcher, udp_readable_cb, sock, EV_READ);
+  ev_io_start(loop, &udp_watcher);
+
+  ev_run(loop, 0);
+
   return EXIT_SUCCESS;
 }
+
 
