@@ -31,7 +31,7 @@ int main(void)
   ev_io udp_watcher;
   struct ev_loop *loop;
   addr_len = sizeof(addr);
-  sock = socket(AF_INET, SOCK_DGRAM, 0);
+  sock = socket(PF_INET, SOCK_DGRAM, 0);
   fcntl(sock, F_SETFL, O_NONBLOCK);
   bzero(&addr, addr_len);
   addr.sin_family = AF_INET;
