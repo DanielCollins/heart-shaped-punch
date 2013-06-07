@@ -25,7 +25,6 @@ void udp_readable_cb(EV_P_ ev_io *w, int revents)
   printf(": %s\n", buffer);
 }
 
-
 int main(void)
 {
   ev_io udp_watcher;
