@@ -1,5 +1,5 @@
-CFLAGS += -pedantic -Wall -Wextra -Werror -pipe
-LDFLAGS += -lev
+CFLAGS += -I/usr/local/include -pedantic -Wall -Wextra -Werror -pipe
+LDFLAGS += -L/usr/local/lib -lev
 
 all: hsp
 
