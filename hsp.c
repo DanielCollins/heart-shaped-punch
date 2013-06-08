@@ -28,9 +28,9 @@ enum HostState
 };
 
 int sock;
-struct sockaddr_in out_addr, in_addr;
+struct sockaddr_in in_addr;
 struct sockaddr client_addr;
-socklen_t out_addr_len, in_addr_len, client_addr_len;
+socklen_t in_addr_len, client_addr_len;
 enum HostState state;
 
 void acknowledge(void)
@@ -109,7 +109,6 @@ int main(int argc, char *argv[])
 
   state = DEAD;
   in_addr_len = sizeof(in_addr);
-  out_addr_len = sizeof(out_addr);
   client_addr_len = sizeof(client_addr);
   sock = socket(PF_INET, SOCK_DGRAM, 0);
   fcntl(sock, F_SETFL, O_NONBLOCK);
