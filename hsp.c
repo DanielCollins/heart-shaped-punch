@@ -13,9 +13,11 @@
 #include <unistd.h>
 #include <string.h>
 
-int sock, consock;
-struct sockaddr_in out_addr, in_addr, con_addr;
-socklen_t out_addr_len, in_addr_len, con_addr_len;
+#define PORT "42000"
+
+int sock;
+struct sockaddr_in out_addr, in_addr;
+socklen_t out_addr_len, in_addr_len;
 
 void udp_readable_cb(EV_P_ ev_io *w, int revents)
 {
@@ -30,17 +32,33 @@ void udp_readable_cb(EV_P_ ev_io *w, int revents)
   printf(": %s\n", buffer);
 }
 
+void spam(char *host)
+{
+  struct addrinfo hints, *servinfo;
+  int rv;
+  char buffer[] = "spam";
+
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_DGRAM;
+  if ((rv = getaddrinfo(host, PORT, &hints, &servinfo)) != 0)
+  {
+    fprintf(stderr, "gettaddrifo: %s\n", gai_strerror(rv));
+    return;
+  }
+  if (!servinfo) return;
+  sendto(sock, buffer, strlen(buffer), 0, servinfo->ai_addr,
+           servinfo->ai_addrlen);
+  freeaddrinfo(servinfo);
+}
+
 int main(int argc, char *argv[])
 {
   ev_io udp_watcher;
   struct ev_loop *loop;
-  int rv;
-  struct addrinfo hints, *servinfo, *p;
-  char buffer[] = "spam";
 
   in_addr_len = sizeof(in_addr);
   out_addr_len = sizeof(out_addr);
-  con_addr_len = sizeof(con_addr);
   sock = socket(PF_INET, SOCK_DGRAM, 0);
   fcntl(sock, F_SETFL, O_NONBLOCK);
   bzero(&in_addr, in_addr_len);
@@ -51,28 +69,7 @@ int main(int argc, char *argv[])
     fprintf(stderr, "could not bind\n");
 
   if (argc == 2)
-  {
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_DGRAM;
-    if ((rv = getaddrinfo(argv[1], "42000", &hints, &servinfo)) != 0)
-    {
-      fprintf(stderr, "gettaddrinfo: %s\n", gai_strerror(rv));
-      return EXIT_FAILURE;
-    }
-    for (p = servinfo; p != 0; p = p->ai_next)
-    {
-      if ((consock = socket(p->ai_family, p->ai_socktype,
-           p->ai_protocol)) == -1)
-      {
-        perror("socket");
-        continue;
-      }
-      break;
-    }
-    sendto(sock, buffer, strlen(buffer), 0, p->ai_addr, p->ai_addrlen);
-    freeaddrinfo(servinfo);
-  }
+    spam(argv[1]);
 
   loop = ev_default_loop(0);
   ev_io_init(&udp_watcher, udp_readable_cb, sock, EV_READ);
