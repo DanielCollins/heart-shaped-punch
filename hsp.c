@@ -27,64 +27,115 @@ enum HostState
   ESTABLISHED
 };
 
-int sock;
-struct sockaddr_in in_addr;
-struct sockaddr client_addr;
-socklen_t in_addr_len, client_addr_len;
-enum HostState state;
+struct Peer
+{
+  struct sockaddr addr;
+  socklen_t addr_len;
+  enum HostState state;
+  struct Peer *next;
+};
 
-void acknowledge(void)
+int sock;
+struct sockaddr_in listen_addr;
+socklen_t listen_addr_len;
+struct Peer *peers;
+
+struct Peer *new_peer()
+{
+  struct Peer *result;
+  if (!(result = malloc(sizeof(struct Peer))))
+  {
+    fprintf(stderr, "error: malloc failed\n");
+    return 0;
+  }
+  result->next = peers;
+  peers = result;
+  result->state = DEAD;
+  result->addr_len = sizeof(result->addr);
+  bzero(&result->addr, result->addr_len);
+  return result;
+}
+
+int addr_equal(struct sockaddr *a, socklen_t a_len,
+   struct sockaddr *b, socklen_t b_len)
+{
+  if (a_len != b_len) return 0;
+  return memcmp(a, b, a_len) == 0;
+}
+
+struct Peer *get_peer(struct sockaddr *addr, socklen_t len)
+{
+  struct Peer *result;
+  for (result = peers; result; result = result->next)
+    if (addr_equal(&result->addr, result->addr_len, addr, len))
+      return result;
+  return 0;
+}
+
+void acknowledge(struct Peer *p)
 {
   char b = ACK;
-  sendto(sock, &b, 1, 0, &client_addr, client_addr_len);
+  sendto(sock, &b, 1, 0, &p->addr, p->addr_len);
 }
 
-void establish(void)
+void establish(struct Peer *p)
 { 
   char b = EST;
-  sendto(sock, &b, 1, 0, &client_addr, client_addr_len);      
+  sendto(sock, &b, 1, 0, &p->addr, p->addr_len);      
 }
 
-void _connect(void)
+void _connect(struct Peer *p)
 { 
   char b = CON;
-  sendto(sock, &b, 1, 0, &client_addr, client_addr_len);      
+  sendto(sock, &b, 1, 0, &p->addr, p->addr_len);      
 }
 
 void udp_readable_cb(EV_P_ ev_io *w, int revents)
 {
   char b;
+  struct sockaddr src;
+  socklen_t len;
+  struct Peer *p;
   (void) loop;
   (void) w;
   (void) revents;
-  recvfrom(sock, &b, 1, 0, &client_addr, &client_addr_len);
+  len = sizeof(src);
+  recvfrom(sock, &b, 1, 0, &src, &len);
+  p = get_peer(&src, len);
   switch (b)
   {
     case CON:
-      if (state == DEAD || state == CONNECTING)
+      printf("client wants to connect\n");
+      if (!p)
       {
-        acknowledge();
-        state = ACKNOWLEDGING;
-        printf("client wants to connect\n");
+        p = new_peer();
+        memcpy(&p->addr, &src, len);
+        p->state = ACKNOWLEDGING;
+        acknowledge(p);
+      }
+      else if (p->state == DEAD)
+      {
+        acknowledge(p);
+        p->state = ACKNOWLEDGING;
       }  
       return;
     case ACK:
-      if (state == CONNECTING || state == ESTABLISHED)
+      if (p->state == CONNECTING || p->state == ESTABLISHED)
       {
-        establish();
-        state = ESTABLISHED;
+        establish(p);
+        p->state = ESTABLISHED;
         printf("established\n");
       }
       return;
     case EST:
       printf("established\n");
-      state = ESTABLISHED;
+      p->state = ESTABLISHED;
       return;
   }
   fprintf(stderr, "warning: bad packet\n");
 }
 
-void lookup(char *host)
+void lookup(char *host, struct Peer *p)
 {
   struct addrinfo hints, *servinfo;
   int rv;
@@ -97,8 +148,8 @@ void lookup(char *host)
     return;
   }
   if (!servinfo) return;
-  memcpy(&client_addr, servinfo->ai_addr, servinfo->ai_addrlen);
-  client_addr_len = servinfo->ai_addrlen;
+  memcpy(&p->addr, servinfo->ai_addr, servinfo->ai_addrlen);
+  p->addr_len = servinfo->ai_addrlen;
 /*  freeaddrinfo(servinfo); */
 }
 
@@ -106,26 +157,25 @@ int main(int argc, char *argv[])
 {
   ev_io udp_watcher;
   struct ev_loop *loop;
+  struct Peer *p;
 
-  state = DEAD;
-  in_addr_len = sizeof(in_addr);
-  client_addr_len = sizeof(client_addr);
+  p = 0;
+  listen_addr_len = sizeof(listen_addr);
   sock = socket(PF_INET, SOCK_DGRAM, 0);
   fcntl(sock, F_SETFL, O_NONBLOCK);
-  bzero(&in_addr, in_addr_len);
-  in_addr.sin_family = AF_INET;
-  in_addr.sin_port = htons(42000);
-  in_addr.sin_addr.s_addr = INADDR_ANY;
-  if (bind(sock, (struct sockaddr*) &in_addr, in_addr_len) != 0)
+  bzero(&listen_addr, listen_addr_len);
+  listen_addr.sin_family = AF_INET;
+  listen_addr.sin_port = htons(42000);
+  listen_addr.sin_addr.s_addr = INADDR_ANY;
+  if (bind(sock, (struct sockaddr*) &listen_addr, listen_addr_len) != 0)
     fprintf(stderr, "could not bind\n");
-
-  state = DEAD;
 
   if (argc == 2)
   {
-    lookup(argv[1]);
-    state = CONNECTING;
-    _connect();
+    p = new_peer();
+    lookup(argv[1], p);
+    p->state = CONNECTING;
+    _connect(p);
   }
 
   loop = ev_default_loop(0);
