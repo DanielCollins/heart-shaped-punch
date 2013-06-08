@@ -65,6 +65,7 @@ void udp_readable_cb(EV_P_ ev_io *w, int revents)
       {
         acknowledge();
         state = ACKNOWLEDGING;
+        printf("client wants to connect\n");
       }  
       return;
     case ACK:
