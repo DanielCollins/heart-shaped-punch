@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
       }
       break;
     }
-    sendto(consock, buffer, strlen(buffer), 0, p->ai_addr, p->ai_addrlen);
+    sendto(sock, buffer, strlen(buffer), 0, p->ai_addr, p->ai_addrlen);
     freeaddrinfo(servinfo);
   }
 
