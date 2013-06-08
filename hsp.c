@@ -27,7 +27,6 @@ void udp_readable_cb(EV_P_ ev_io *w, int revents)
   bytes_read = recvfrom(sock, buffer, 1000, 0, (struct sockaddr*) &out_addr,         
    (socklen_t*) &out_addr_len);
   buffer[bytes_read] = '\0';
- out_addr_len);
   printf(": %s\n", buffer);
 }
 
