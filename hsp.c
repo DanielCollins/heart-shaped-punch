@@ -72,7 +72,7 @@ void udp_readable_cb(EV_P_ ev_io *w, int revents)
       {
         establish();
         state = ESTABLISHED;
-        printf("established");
+        printf("established\n");
       }
       return;
     case EST:
