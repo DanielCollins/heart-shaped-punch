@@ -166,7 +166,6 @@ void udp_readable_cb(EV_P_ ev_io *w, int revents)
         remove_peer(p);
       }
   }
-  fprintf(stderr, "warning: bad packet\n");
 }
 
 static void sigint_cb(struct ev_loop *loop, struct ev_signal *w, int revents)
