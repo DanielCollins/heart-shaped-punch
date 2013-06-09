@@ -18,6 +18,7 @@
 #define CON 0
 #define ACK 1
 #define EST 2
+#define DIE 3
 
 enum HostState
 {
@@ -72,6 +73,22 @@ struct Peer *get_peer(struct sockaddr *addr, socklen_t len)
   return 0;
 }
 
+void remove_peer(struct Peer *p)
+{
+  struct Peer *i, *last;
+  for (i = peers, last = 0; i; last = i, i = i->next)
+  {
+    if (i == p)
+    {
+      if (last)
+        last->next = p->next;
+      else
+        peers = p->next;
+      free(p);
+    }
+  } 
+}
+
 void acknowledge(struct Peer *p)
 {
   char b = ACK;
@@ -88,6 +105,14 @@ void _connect(struct Peer *p)
 { 
   char b = CON;
   sendto(sock, &b, 1, 0, &p->addr, p->addr_len);      
+}
+
+void die(struct Peer *p)
+{
+  char b = DIE;
+  int i;
+  for (i = 0; i < 5; ++i)
+    sendto(sock, &b, 1, 0, &p->addr, p->addr_len);
 }
 
 void udp_readable_cb(EV_P_ ev_io *w, int revents)
@@ -134,8 +159,21 @@ void udp_readable_cb(EV_P_ ev_io *w, int revents)
         p->state = ESTABLISHED;
         return;
       }
+    case DIE:
+      if (p)
+      {
+        printf("peer disconected\n");
+        remove_peer(p);
+      }
   }
   fprintf(stderr, "warning: bad packet\n");
+}
+
+static void sigint_cb(struct ev_loop *loop, struct ev_signal *w, int revents)
+{
+  (void) w;
+  (void) revents;
+  ev_unloop(loop, EVUNLOOP_ALL);
 }
 
 void lookup(char *host, struct Peer *p)
@@ -159,6 +197,7 @@ void lookup(char *host, struct Peer *p)
 int main(int argc, char *argv[])
 {
   ev_io udp_watcher;
+  struct ev_signal signal_watcher;
   struct ev_loop *loop;
   struct Peer *p;
 
@@ -182,10 +221,17 @@ int main(int argc, char *argv[])
   }
 
   loop = ev_default_loop(0);
+
   ev_io_init(&udp_watcher, udp_readable_cb, sock, EV_READ);
   ev_io_start(loop, &udp_watcher);
 
+  ev_signal_init(&signal_watcher, sigint_cb, SIGINT);
+  ev_signal_start(loop, &signal_watcher);
+
   ev_run(loop, 0);
+
+  for (p = peers; p; p = p->next)
+    die(p);
 
   return EXIT_SUCCESS;
 }
