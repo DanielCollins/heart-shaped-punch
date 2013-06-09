@@ -150,7 +150,7 @@ void lookup(char *host, struct Peer *p)
   if (!servinfo) return;
   memcpy(&p->addr, servinfo->ai_addr, servinfo->ai_addrlen);
   p->addr_len = servinfo->ai_addrlen;
-/*  freeaddrinfo(servinfo); */
+  freeaddrinfo(servinfo);
 }
 
 int main(int argc, char *argv[])
