@@ -120,7 +120,7 @@ void udp_readable_cb(EV_P_ ev_io *w, int revents)
       }  
       return;
     case ACK:
-      if (p->state == CONNECTING || p->state == ESTABLISHED)
+      if (p && (p->state == CONNECTING || p->state == ESTABLISHED))
       {
         establish(p);
         p->state = ESTABLISHED;
@@ -128,9 +128,12 @@ void udp_readable_cb(EV_P_ ev_io *w, int revents)
       }
       return;
     case EST:
-      printf("established\n");
-      p->state = ESTABLISHED;
-      return;
+      if (p && p->state == ACKNOWLEDGING)
+      {
+        printf("established\n");
+        p->state = ESTABLISHED;
+        return;
+      }
   }
   fprintf(stderr, "warning: bad packet\n");
 }
