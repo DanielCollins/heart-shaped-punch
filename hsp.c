@@ -113,6 +113,7 @@ void die(struct Peer *p)
   int i;
   for (i = 0; i < 5; ++i)
     sendto(sock, &b, 1, 0, &p->addr, p->addr_len);
+  remove_peer(p);
 }
 
 void udp_readable_cb(EV_P_ ev_io *w, int revents)
